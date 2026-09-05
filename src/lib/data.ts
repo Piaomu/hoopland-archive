@@ -92,6 +92,20 @@ export function resultLabel(yr: number, tid: number, round: number): string {
   return names[round] ?? `Lost round ${round}`;
 }
 
+// Roster index: every player who logged a regular-season or playoff row for a team in a year.
+export interface RosterEntry { p: Player; rows: (StatLine & { tid: number })[]; po: (StatLine & { tid: number })[]; fin: (StatLine & { tid: number })[]; moved: boolean }
+const rosterIdx = new Map<string, RosterEntry[]>();
+for (const p of players) for (const s of p.seasons) {
+  const tids = new Set([...s.rows.map((r) => r.tid), ...s.po.map((r) => r.tid)]);
+  for (const tid of tids) {
+    const k = `${tid}-${s.yr}`;
+    if (!rosterIdx.has(k)) rosterIdx.set(k, []);
+    rosterIdx.get(k)!.push({ p, rows: s.rows.filter((r) => r.tid === tid), po: s.po.filter((r) => r.tid === tid), fin: s.fin.filter((r) => r.tid === tid), moved: s.rows.length > 1 });
+  }
+}
+export const roster = (tid: number, yr: number): RosterEntry[] => rosterIdx.get(`${tid}-${yr}`) ?? [];
+export const teamSeasonUrl = (tid: number, yr: number) => url(`/teams/${teamAbbr(tid)}/${yr}/`);
+
 // Player's team in a given year (last row of that season), for linking.
 export const playerTeamIn = (p: Player, yr: number) => p.seasons.find((s) => s.yr === yr)?.rows.at(-1)?.tid ?? p.tid;
 

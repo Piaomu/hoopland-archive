@@ -1,6 +1,8 @@
 ---
+// Links a team abbreviation to the franchise page, or to that franchise's season page when `yr` is given.
 import { teamAbbr, url } from '../lib/data';
-interface Props { id: number }
-const { id } = Astro.props;
+interface Props { id: number; yr?: number }
+const { id, yr } = Astro.props;
+const href = yr ? url(`/teams/${teamAbbr(id)}/${yr}/`) : url(`/teams/${teamAbbr(id)}/`);
 ---
-<a href={url(`/teams/${teamAbbr(id)}/`)}>{teamAbbr(id)}</a>
+<a href={href}>{teamAbbr(id)}</a>

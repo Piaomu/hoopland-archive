@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import StatTable from '../../components/StatTable.astro';
-import { teams, league, players, coaches, teamName, teamAbbr, playerName, coachName, resultLabel, pct, f1, url, sumRows, posName, PUB } from '../../lib/data';
+import { teams, league, players, coaches, teamName, teamAbbr, playerName, coachName, resultLabel, pct, f1, url, sumRows, posName, PUB, teamSeasonUrl } from '../../lib/data';
 export function getStaticPaths() { return teams.map((t) => ({ params: { abbr: t.abbr } })); }
 const t = teams.find((x) => x.abbr === Astro.params.abbr)!;
 const w = t.seasons.reduce((n, s) => n + s.W, 0), l = t.seasons.reduce((n, s) => n + s.L, 0);
@@ -38,14 +38,14 @@ const hofers = alumni.filter((a) => a.p.hofYear).sort((a, b) => b.line.PTS - a.l
     {worst && <div class="card"><div class="big">{worst.W}–{worst.L}</div><div class="muted">Worst season, <a href={url(`/seasons/${worst.yr}/`)}>{worst.yr}</a></div></div>}
   </div>
 
-  {rosterRows.length > 0 && <><h2>{PUB} roster</h2><StatTable rows={rosterRows} firstCol="Player" secondCol="Pos" totals={false} /></>}
+  {rosterRows.length > 0 && <><h2><a href={teamSeasonUrl(t.id, PUB)}>{PUB} roster</a></h2><StatTable rows={rosterRows} firstCol="Player" secondCol="Pos" totals={false} /></>}
 
   <h2>Season by season</h2>
   <div class="tablewrap"><table>
     <thead><tr><th>Year</th><th>W</th><th>L</th><th>Pct</th><th>Home</th><th>Away</th><th>Div</th><th>Conf</th><th>PF</th><th>PA</th><th>Seed</th><th class="l">Result</th><th>Playoffs</th><th>Pick</th><th class="l">Coach</th></tr></thead>
     <tbody>{[...t.seasons].reverse().map((s) => { const c = coachIn(s.yr); const res = resultLabel(s.yr, t.id, s.round); return (
       <tr class={res === 'Won Finals' ? 'hl' : ''}>
-        <td class="l"><a href={url(`/seasons/${s.yr}/`)}>{s.yr}</a></td><td>{s.W}</td><td>{s.L}</td><td>{pct(s.W, s.L)}</td>
+        <td class="l"><a href={teamSeasonUrl(t.id, s.yr)}>{s.yr}</a> <a class="muted small" href={url(`/seasons/${s.yr}/`)}>league</a></td><td>{s.W}</td><td>{s.L}</td><td>{pct(s.W, s.L)}</td>
         <td>{s.home.w}–{s.home.l}</td><td>{s.away.w}–{s.away.l}</td><td>{s.div.w}–{s.div.l}</td><td>{s.conf.w}–{s.conf.l}</td>
         <td>{f1(s.PTS / Math.max(1, s.GP))}</td><td>{f1(s.OPP / Math.max(1, s.GP))}</td><td>{s.seed || ''}</td>
         <td class="l">{res === 'Won Finals' ? <span>🏆 Won Finals</span> : res}</td>

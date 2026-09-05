@@ -19,7 +19,7 @@ const label = (i: number) => (n === 4 ? names[i] : i === n - 1 ? 'Finals' : `Rou
           <div class="series">
             {[sr.top, sr.low].map((tid) => (
               <div class={tid === sr.winner ? 'w' : ''}>
-                <span><span class="seed">{seedOf(tid)}</span><a href={url(`/teams/${teamAbbr(tid)}/`)}>{teamAbbr(tid)}</a></span>
+                <span><span class="seed">{seedOf(tid)}</span><a href={url(`/teams/${teamAbbr(tid)}/${bracket.yr}/`)}>{teamAbbr(tid)}</a></span>
                 <span>{wins(tid)}</span>
               </div>
             ))}

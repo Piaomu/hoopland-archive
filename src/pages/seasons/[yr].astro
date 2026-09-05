@@ -47,7 +47,7 @@ const contractStr = (c?: { yrs: number; sal: number; opt: number }) => (c ? `${c
           <tbody>
             {conf(ci).map((r) => { const c = coachOf(r.tid); return (
               <tr class={r.tid === champ?.tid ? 'hl' : ''}>
-                <td class="l"><TeamLink id={r.tid} /> {teamName(r.tid)} <span class="muted small">{divName(r.tid)}</span></td>
+                <td class="l"><TeamLink id={r.tid} yr={yr} /> <a href={url(`/teams/${teamAbbr(r.tid)}/${yr}/`)}>{teamName(r.tid)}</a> <span class="muted small">{divName(r.tid)}</span></td>
                 <td>{r.W}</td><td>{r.L}</td><td>{pct(r.W, r.L)}</td>
                 <td>{r.home.w}–{r.home.l}</td><td>{r.away.w}–{r.away.l}</td>
                 <td>{f1(r.PTS / Math.max(1, r.GP))}</td><td>{f1(r.OPP / Math.max(1, r.GP))}</td>

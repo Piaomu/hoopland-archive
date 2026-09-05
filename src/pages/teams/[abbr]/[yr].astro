@@ -1,0 +1,63 @@
+---
+import Base from '../../../layouts/Base.astro';
+import StatTable from '../../../components/StatTable.astro';
+import PlayerLink from '../../../components/PlayerLink.astro';
+import { teams, league, teamName, teamAbbr, coaches, coachName, awardName, resultLabel, pct, f1, url, posName, roster, sumRows, teamSeasonUrl, season as loadSeason } from '../../../lib/data';
+export function getStaticPaths() { return teams.flatMap((t) => t.seasons.map((s) => ({ params: { abbr: t.abbr, yr: String(s.yr) } }))); }
+const t = teams.find((x) => x.abbr === Astro.params.abbr)!;
+const yr = Number(Astro.params.yr);
+const s = t.seasons.find((x) => x.yr === yr)!;
+const prevYr = t.seasons.find((x) => x.yr === yr - 1)?.yr, nextYr = t.seasons.find((x) => x.yr === yr + 1)?.yr;
+const res = resultLabel(yr, t.id, s.round);
+const coach = coaches.find((c) => c.tenures.some((x) => x.yr === yr && x.tid === t.id));
+const sf = loadSeason(yr);
+const confRank = sf.standings.filter((r) => teams.find((x) => x.id === r.tid)?.conference === t.conference).findIndex((r) => r.tid === t.id) + 1;
+const entries = roster(t.id, yr);
+const rows = entries.filter((e) => e.rows.length).map((e) => ({
+  label: `${e.p.fn} ${e.p.ln}${e.moved ? ' *' : ''}`, href: url(`/players/${e.p.id}/`), sub: posName(e.p.pos), line: sumRows(e.rows),
+  hl: false,
+})).sort((a, b) => b.line.MIN - a.line.MIN);
+const poRows = entries.filter((e) => e.po.length).map((e) => ({ label: `${e.p.fn} ${e.p.ln}`, href: url(`/players/${e.p.id}/`), sub: posName(e.p.pos), line: sumRows(e.po) })).sort((a, b) => b.line.MIN - a.line.MIN);
+const honors = entries.flatMap((e) => e.p.awards.filter((a) => a.years.includes(yr) && a.id !== 0).map((a) => ({ pid: e.p.id, name: awardName(a.id) })));
+const picks = sf.draft.filter((d) => d.tid === t.id);
+const retiredNow = t.retiredNumbers.filter((r) => r.yr === yr);
+const anyMoved = entries.some((e) => e.moved);
+const playoffSeries = sf.bracket?.rounds.flatMap((round, i) => round.filter((sr) => sr.top === t.id || sr.low === t.id).map((sr) => ({ ...sr, round: i }))) ?? [];
+---
+<Base title={`${yr} ${teamName(t.id)}`}>
+  <div class="teambar" style={`background:linear-gradient(90deg,${t.colors.map((c) => '#' + c).join(',')})`}></div>
+  <p class="small">{prevYr && <a href={teamSeasonUrl(t.id, prevYr)}>← {prevYr}</a>} &nbsp; <a href={url(`/teams/${t.abbr}/`)}>{teamName(t.id)} franchise</a> &nbsp; <a href={url(`/seasons/${yr}/`)}>{yr} league season</a> &nbsp; {nextYr && <a href={teamSeasonUrl(t.id, nextYr)}>{nextYr} →</a>}</p>
+  <h1>{yr} {teamName(t.id)}</h1>
+  <p class="muted">{league.conferences[t.conference]} · {league.divisions[t.division]} Division{coach && <span> · Head coach <a href={url(`/coaches/${coach.id}/`)}>{coachName(coach.id)}</a></span>}</p>
+
+  <div class="cards">
+    <div class="card"><div class="big">{s.W}–{s.L}</div><div class="muted">Record ({pct(s.W, s.L)}){confRank ? `, ${confRank}${confRank === 1 ? 'st' : confRank === 2 ? 'nd' : confRank === 3 ? 'rd' : 'th'} in the ${league.conferences[t.conference]}` : ''}</div></div>
+    <div class="card"><div class="big">{s.home.w}–{s.home.l}</div><div class="muted">Home · {s.away.w}–{s.away.l} away</div></div>
+    <div class="card"><div class="big">{f1(s.PTS / Math.max(1, s.GP))}</div><div class="muted">Points per game · {f1(s.OPP / Math.max(1, s.GP))} allowed</div></div>
+    <div class="card"><div class="big">{res === 'Won Finals' ? '🏆' : s.seed || '—'}</div><div class="muted">{res === 'Won Finals' ? 'Champions' : s.seed ? `Seed · ${res}` : res}{s.round > 0 ? ` · ${s.po.w}–${s.po.l} in the playoffs` : ''}</div></div>
+  </div>
+
+  {playoffSeries.length > 0 && <p class="small"><strong>Playoff run:</strong> {playoffSeries.map((sr, i) => { const opp = sr.top === t.id ? sr.low : sr.top; const won = sr.winner === t.id; const w = won ? sr.firstTo : sr.games - sr.firstTo; const l = won ? sr.games - sr.firstTo : sr.firstTo; return <span>{i ? ' · ' : ''}{won ? 'def.' : 'lost to'} <a href={teamSeasonUrl(opp, yr)}>{teamAbbr(opp)}</a> {w}–{l}</span>; })}</p>}
+  {honors.length > 0 && <p class="small"><strong>Honors:</strong> {honors.map((h, i) => <span>{i ? ', ' : ''}<PlayerLink id={h.pid} /> ({h.name})</span>)}</p>}
+
+  <h2>Roster</h2>
+  {rows.length ? <StatTable rows={rows} firstCol="Player" secondCol="Pos" totals={false} /> : <p class="muted small">No player statistics survive for this season.</p>}
+  {anyMoved && <p class="muted small">* Played for more than one team this season; only games with {teamAbbr(t.id)} are shown.</p>}
+
+  {poRows.length > 0 && <><h2>Playoff statistics</h2><StatTable rows={poRows} firstCol="Player" secondCol="Pos" totals={false} /></>}
+
+  <div class="grid">
+    <div>
+      <h2>Draft picks</h2>
+      {picks.length ? <ul class="plain">{picks.map((d) => <li>Round {d.rd}, pick {d.pk}: <PlayerLink id={d.pid} /></li>)}</ul> : <p class="muted small">None on record.</p>}
+    </div>
+    <div>
+      <h2>Team statistics</h2>
+      <div class="tablewrap"><table>
+        <thead><tr><th>GP</th><th>PTS</th><th>OPP</th><th>FG%</th><th>3P%</th><th>FT%</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TOV</th></tr></thead>
+        <tbody><tr><td>{s.GP}</td><td>{f1(s.PTS / Math.max(1, s.GP))}</td><td>{f1(s.OPP / Math.max(1, s.GP))}</td><td>{(s.FGM / Math.max(1, s.FGA)).toFixed(3).replace(/^0/, '')}</td><td>{(s.TPM / Math.max(1, s.TPA)).toFixed(3).replace(/^0/, '')}</td><td>{(s.FTM / Math.max(1, s.FTA)).toFixed(3).replace(/^0/, '')}</td><td>{f1(s.REB / Math.max(1, s.GP))}</td><td>{f1(s.AST / Math.max(1, s.GP))}</td><td>{f1(s.STL / Math.max(1, s.GP))}</td><td>{f1(s.BLK / Math.max(1, s.GP))}</td><td>{f1(s.TO / Math.max(1, s.GP))}</td></tr></tbody>
+      </table></div>
+      {retiredNow.length > 0 && <p class="small"><strong>Numbers retired this year:</strong> {retiredNow.map((r, i) => <span>{i ? ', ' : ''}#{r.num} <PlayerLink id={r.pid} /></span>)}</p>}
+    </div>
+  </div>
+</Base>

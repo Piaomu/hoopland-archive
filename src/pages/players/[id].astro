@@ -4,8 +4,8 @@ import StatTable from '../../components/StatTable.astro';
 import { players, teams, league, teamAbbr, teamName, collegeName, awardName, posName, height, url, sumRows, PUB } from '../../lib/data';
 export function getStaticPaths() { return players.map((p) => ({ params: { id: String(p.id) } })); }
 const p = players.find((x) => x.id === Number(Astro.params.id))!;
-const rows = p.seasons.flatMap((s) => s.rows.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/`), line: r, hl: league.champions.some((c) => c.yr === s.yr && c.tid === r.tid) })));
-const poRows = p.seasons.flatMap((s) => s.po.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/`), line: r })));
+const rows = p.seasons.flatMap((s) => s.rows.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/${s.yr}/`), line: r, hl: league.champions.some((c) => c.yr === s.yr && c.tid === r.tid) })));
+const poRows = p.seasons.flatMap((s) => s.po.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/${s.yr}/`), line: r })));
 const career = sumRows(p.seasons.flatMap((s) => s.rows));
 const from = p.seasons[0]?.yr, to = p.seasons.at(-1)?.yr;
 const active = !p.yearRetired && to === PUB;
