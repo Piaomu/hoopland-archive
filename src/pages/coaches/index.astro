@@ -1,0 +1,21 @@
+---
+import Base from '../../layouts/Base.astro';
+import { coaches, league, teamAbbr, pct, url, PUB } from '../../lib/data';
+const rows = coaches.map((c) => {
+  const w = c.tenures.reduce((n, t) => n + t.W, 0), l = c.tenures.reduce((n, t) => n + t.L, 0);
+  const titles = c.tenures.filter((t) => league.champions.some((x) => x.yr === t.yr && x.tid === t.tid)).map((t) => t.yr);
+  const po = c.tenures.filter((t) => t.po.w + t.po.l > 0).length;
+  const teams = [...new Set(c.tenures.map((t) => t.tid))];
+  return { c, w, l, titles, po, teams, from: c.tenures[0].yr, to: c.tenures.at(-1)!.yr };
+}).sort((a, b) => b.w - a.w);
+---
+<Base title="Coaches">
+  <h1>Coaches</h1>
+  <div class="tablewrap"><table>
+    <thead><tr><th class="l">Coach</th><th>Years</th><th>Seasons</th><th>W</th><th>L</th><th>Pct</th><th>Playoffs</th><th>Titles</th><th class="l">Teams</th></tr></thead>
+    <tbody>{rows.map((r) => <tr>
+      <td class="l"><a href={url(`/coaches/${r.c.id}/`)}>{r.c.fn} {r.c.ln}</a></td><td>{r.from}–{r.to === PUB && !r.c.yearRetired ? 'present' : r.to}</td><td>{r.c.tenures.length}</td>
+      <td>{r.w}</td><td>{r.l}</td><td>{pct(r.w, r.l)}</td><td>{r.po}</td><td>{r.titles.length}</td><td class="l small">{r.teams.map(teamAbbr).join(', ')}</td>
+    </tr>)}</tbody>
+  </table></div>
+</Base>

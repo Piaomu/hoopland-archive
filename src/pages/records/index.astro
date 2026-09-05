@@ -1,0 +1,35 @@
+---
+import Base from '../../layouts/Base.astro';
+import { records, playersIndex, playerName, teamAbbr, url, f1 } from '../../lib/data';
+const labels: Record<string, string> = { PTS: 'Points', FGM: 'Field goals made', TPM: '3-pointers made', FTM: 'Free throws made', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks', TO: 'Turnovers' };
+const scopes: [keyof typeof records, string][] = [['season', 'Regular season'], ['playoffs', 'Playoffs'], ['finals', 'Finals']];
+const careerTop = (k: 'PTS' | 'REB' | 'AST' | 'GP') => [...playersIndex].sort((a, b) => b[k] - a[k]).slice(0, 10);
+---
+<Base title="Records">
+  <h1>Records</h1>
+  <h2>Career leaders</h2>
+  <div class="cards">
+    {([['PTS', 'Points'], ['REB', 'Rebounds'], ['AST', 'Assists'], ['GP', 'Games played']] as const).map(([k, label]) => (
+      <div class="card"><div class="muted small">{label}</div>
+        <ol style="padding-left:1.2em;margin:.3em 0">{careerTop(k).map((p) => <li><a href={url(`/players/${p.id}/`)}>{p.fn} {p.ln}</a> <strong>{p[k].toLocaleString()}</strong></li>)}</ol>
+      </div>
+    ))}
+  </div>
+  {scopes.map(([scope, title]) => {
+    const book = records[scope];
+    const stats = Object.entries(book).filter(([, list]) => list.length);
+    if (!stats.length) return null;
+    return (
+      <section>
+        <h2>Single-game records: {title}</h2>
+        <div class="cards">
+          {stats.map(([k, list]) => (
+            <div class="card"><div class="muted small">{labels[k] ?? k}</div>
+              <ol style="padding-left:1.2em;margin:.3em 0">{list.slice(0, 5).map((r) => <li><a href={url(`/players/${r.pid}/`)}>{playerName(r.pid)}</a> <strong>{r.value}</strong> <span class="muted small">{teamAbbr(r.tid)}, <a href={url(`/seasons/${r.yr}/`)}>{r.yr}</a>{r.game ? ` · ${teamAbbr(r.game.away)} ${r.game.as} @ ${teamAbbr(r.game.home)} ${r.game.hs}` : ''}</span></li>)}</ol>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  })}
+</Base>

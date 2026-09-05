@@ -1,0 +1,36 @@
+---
+import Base from '../../layouts/Base.astro';
+import { years, league, teamName, teamAbbr, playerName, awardName, url, season as loadSeason, siteConfig } from '../../lib/data';
+const rows = [...years].reverse().map((yr) => {
+  const s = loadSeason(yr);
+  const best = s.standings[0];
+  const mvp = s.awards.find((a) => a.id === 2);
+  const fmvp = s.awards.find((a) => a.id === 1);
+  const champ = league.champions.find((c) => c.yr === yr);
+  return { yr, s, best, mvp, fmvp, champ, ep: siteConfig.episodes[String(yr)] };
+});
+---
+<Base title="Seasons">
+  <h1>Seasons</h1>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Year</th><th class="l">Champion</th><th class="l">Runner-up</th><th>Series</th><th class="l">Best record</th><th class="l">MVP</th><th class="l">Finals MVP</th><th>Log</th><th class="l">Episode</th></tr></thead>
+    <tbody>
+      {rows.map(({ yr, s, best, mvp, fmvp, champ, ep }) => (
+        <tr>
+          <td class="l"><a href={url(`/seasons/${yr}/`)}><strong>{yr}</strong></a></td>
+          <td class="l">{champ ? <a href={url(`/teams/${teamAbbr(champ.tid)}/`)}>{teamName(champ.tid)}</a> : <span class="muted">In progress</span>}</td>
+          <td class="l">{champ && <a href={url(`/teams/${teamAbbr(champ.runnerUp)}/`)}>{teamName(champ.runnerUp)}</a>}</td>
+          <td>{champ && `${champ.w}–${champ.l}`}</td>
+          <td class="l">{best && <span><a href={url(`/teams/${teamAbbr(best.tid)}/`)}>{teamAbbr(best.tid)}</a> {best.W}–{best.L}</span>}</td>
+          <td class="l">{mvp && <a href={url(`/players/${mvp.pid}/`)}>{playerName(mvp.pid)}</a>}</td>
+          <td class="l">{fmvp && <a href={url(`/players/${fmvp.pid}/`)}>{playerName(fmvp.pid)}</a>}</td>
+          <td>{s.hasDetail ? <span class="pill red">full</span> : ''}</td>
+          <td class="l">{ep && <a href={ep.url}>{ep.title}</a>}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted small">"Full" marks seasons with a preserved transaction log and game-by-game results.</p>
+</Base>

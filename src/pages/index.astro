@@ -1,0 +1,66 @@
+---
+import Base from '../layouts/Base.astro';
+import { siteConfig, league, PUB, years, champions, teams, teamName, teamAbbr, pct, url, season as loadSeason } from '../lib/data';
+const latest = loadSeason(PUB);
+const current = latest.complete ? null : latest;
+const lastComplete = champions.at(-1);
+const allTime = teams.map((t) => {
+  const w = t.seasons.reduce((n, s) => n + s.W, 0), l = t.seasons.reduce((n, s) => n + s.L, 0);
+  const po = t.seasons.filter((s) => s.round > 0).length;
+  return { t, w, l, po, titles: t.titles.length };
+}).sort((a, b) => b.titles - a.titles || (b.w / (b.w + b.l)) - (a.w / (a.w + a.l)));
+const titleCounts = new Map<number, number>();
+for (const c of champions) titleCounts.set(c.tid, (titleCounts.get(c.tid) ?? 0) + 1);
+---
+<Base title="Home" description={siteConfig.tagline}>
+  <div class="hero">
+    <div>
+      <h1>{league.name}</h1>
+      <p class="muted">{siteConfig.tagline} Covering {league.startingYear}–{PUB}, {years.length} seasons, {teams.length} franchises.</p>
+    </div>
+  </div>
+
+  {lastComplete && (
+    <div class="banner">
+      <strong>{lastComplete.yr} champions:</strong> <a href={url(`/teams/${teamAbbr(lastComplete.tid)}/`)}>{teamName(lastComplete.tid)}</a>
+      defeated <a href={url(`/teams/${teamAbbr(lastComplete.runnerUp)}/`)}>{teamName(lastComplete.runnerUp)}</a> {lastComplete.w}–{lastComplete.l} in the Finals.
+      {current && <span class="muted"> The {PUB} season is in progress.</span>}
+      <a href={url(`/seasons/${lastComplete.yr}/`)}>Season page →</a>
+    </div>
+  )}
+
+  <div class="cards">
+    <div class="card"><div class="big">{years.length}</div><div class="muted">Seasons</div></div>
+    <div class="card"><div class="big">{teams.length}</div><div class="muted">Franchises</div></div>
+    <div class="card"><div class="big">{league.playerCount.toLocaleString()}</div><div class="muted">Players on record</div></div>
+    <div class="card"><div class="big">{[...titleCounts.keys()].length}</div><div class="muted">Different champions</div></div>
+  </div>
+
+  <h2>Champions</h2>
+  <div class="timeline">
+    {champions.map((c) => <a href={url(`/seasons/${c.yr}/`)}><span class="yr">{c.yr}</span>{teamAbbr(c.tid)} <span class="muted small">over {teamAbbr(c.runnerUp)} {c.w}–{c.l}</span></a>)}
+  </div>
+
+  <h2>All-time franchise standings</h2>
+  <div class="tablewrap">
+  <table>
+    <thead><tr><th>Franchise</th><th>Since</th><th>W</th><th>L</th><th>Pct</th><th>Playoffs</th><th>Titles</th><th class="l">Championship years</th></tr></thead>
+    <tbody>
+      {allTime.map(({ t, w, l, po, titles }) => (
+        <tr>
+          <td class="l"><span class="swatch" style={`background:#${t.colors[0] ?? '888'}`}></span><a href={url(`/teams/${t.abbr}/`)}>{teamName(t.id)}</a></td>
+          <td>{t.firstYear}</td><td>{w}</td><td>{l}</td><td>{pct(w, l)}</td><td>{po}</td><td>{titles}</td>
+          <td class="l small">{t.titles.join(', ')}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+  </div>
+
+  <h2>About the archive</h2>
+  <p class="muted small">
+    Standings, brackets, awards, and career statistics are carried forward from the league's records for every season.
+    Transaction logs and game-by-game results survive only for seasons where a snapshot was taken at the time:
+    {league.snapshots.filter((y) => y <= PUB).map((y, i) => <span>{i ? ', ' : ''}<a href={url(`/seasons/${y}/`)}>{y}</a></span>)}.
+  </p>
+</Base>

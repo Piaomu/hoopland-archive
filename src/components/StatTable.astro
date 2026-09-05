@@ -1,0 +1,25 @@
+---
+// Per-game stat table for a list of rows (player seasons or a roster).
+import { f1, fmtPct, pg, mpg, sumRows } from '../lib/data';
+import type { StatLine } from '../../ingest/schema';
+interface Row { label: string; href?: string; sub?: string; subHref?: string; line: StatLine; hl?: boolean }
+interface Props { rows: Row[]; firstCol?: string; secondCol?: string; totals?: boolean }
+const { rows, firstCol = 'Season', secondCol = 'Team', totals = true } = Astro.props;
+const tot = sumRows(rows.map((r) => r.line));
+const cells = (l: StatLine) => [l.GP, l.GS, f1(mpg(l)), f1(pg(l, 'PTS')), f1(pg(l, 'REB')), f1(pg(l, 'AST')), f1(pg(l, 'STL')), f1(pg(l, 'BLK')), f1(pg(l, 'TO')), fmtPct(l.FGM / l.FGA), fmtPct(l.TPM / l.TPA), fmtPct(l.FTM / l.FTA), l.DD, l.TD, l.POTG];
+---
+<div class="tablewrap">
+<table>
+  <thead><tr><th>{firstCol}</th>{secondCol && <th class="l">{secondCol}</th>}<th>GP</th><th>GS</th><th>MPG</th><th>PPG</th><th>RPG</th><th>APG</th><th>SPG</th><th>BPG</th><th>TOV</th><th>FG%</th><th>3P%</th><th>FT%</th><th>DD</th><th>TD</th><th>POTG</th></tr></thead>
+  <tbody>
+    {rows.map((r) => (
+      <tr class={r.hl ? 'hl' : ''}>
+        <td class="l">{r.href ? <a href={r.href}>{r.label}</a> : r.label}</td>
+        {secondCol && <td class="l">{r.subHref ? <a href={r.subHref}>{r.sub}</a> : r.sub}</td>}
+        {cells(r.line).map((c) => <td>{c}</td>)}
+      </tr>
+    ))}
+  </tbody>
+  {totals && rows.length > 1 && <tfoot><tr><td class="l">Total</td>{secondCol && <td></td>}{cells(tot).map((c) => <td>{c}</td>)}</tr></tfoot>}
+</table>
+</div>

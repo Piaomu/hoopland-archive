@@ -1,0 +1,88 @@
+---
+import Base from '../../layouts/Base.astro';
+import StatTable from '../../components/StatTable.astro';
+import { teams, league, players, coaches, teamName, teamAbbr, playerName, coachName, resultLabel, pct, f1, url, sumRows, posName, PUB } from '../../lib/data';
+export function getStaticPaths() { return teams.map((t) => ({ params: { abbr: t.abbr } })); }
+const t = teams.find((x) => x.abbr === Astro.params.abbr)!;
+const w = t.seasons.reduce((n, s) => n + s.W, 0), l = t.seasons.reduce((n, s) => n + s.L, 0);
+const poApp = t.seasons.filter((s) => s.round > 0).length;
+const finals = league.champions.filter((c) => c.yr <= PUB && (c.tid === t.id || c.runnerUp === t.id));
+const coachIn = (yr: number) => coaches.find((c) => c.tenures.some((x) => x.yr === yr && x.tid === t.id));
+const best = [...t.seasons].sort((a, b) => b.W / Math.max(1, b.W + b.L) - a.W / Math.max(1, a.W + a.L))[0];
+const worst = [...t.seasons].sort((a, b) => a.W / Math.max(1, a.W + a.L) - b.W / Math.max(1, b.W + b.L))[0];
+// Franchise leaders: every player who logged a season row for this team.
+const alumni = players.flatMap((p) => {
+  const rows = p.seasons.flatMap((s) => s.rows.filter((r) => r.tid === t.id));
+  if (!rows.length) return [];
+  const yrs = p.seasons.filter((s) => s.rows.some((r) => r.tid === t.id)).map((s) => s.yr);
+  return [{ p, line: sumRows(rows), from: yrs[0], to: yrs.at(-1)!, seasons: yrs.length }];
+});
+const topBy = (k: 'PTS' | 'REB' | 'AST' | 'STL' | 'BLK' | 'GP' | 'TPM') => [...alumni].sort((a, b) => b.line[k] - a.line[k]).slice(0, 10);
+const roster = alumni.filter((a) => a.to === PUB).sort((a, b) => b.line.PTS - a.line.PTS);
+const current = t.seasons.find((s) => s.yr === PUB);
+const rosterRows = players.filter((p) => p.seasons.some((s) => s.yr === PUB && s.rows.some((r) => r.tid === t.id)))
+  .map((p) => ({ label: `${p.fn} ${p.ln}`, href: url(`/players/${p.id}/`), sub: posName(p.pos), line: sumRows(p.seasons.find((s) => s.yr === PUB)!.rows.filter((r) => r.tid === t.id)) }))
+  .sort((a, b) => b.line.PTS - a.line.PTS);
+const hofers = alumni.filter((a) => a.p.hofYear).sort((a, b) => b.line.PTS - a.line.PTS);
+---
+<Base title={teamName(t.id)}>
+  <div class="teambar" style={`background:linear-gradient(90deg,${t.colors.map((c) => '#' + c).join(',')})`}></div>
+  <h1>{teamName(t.id)}</h1>
+  <p class="muted">{league.conferences[t.conference]} · {league.divisions[t.division]} Division · Joined {t.firstYear}</p>
+  <div class="cards">
+    <div class="card"><div class="big">{w}–{l}</div><div class="muted">All-time record ({pct(w, l)})</div></div>
+    <div class="card"><div class="big">{t.titles.length}</div><div class="muted">Championship{t.titles.length === 1 ? '' : 's'}{t.titles.length ? ': ' + t.titles.join(', ') : ''}</div></div>
+    <div class="card"><div class="big">{finals.length}</div><div class="muted">Finals appearances</div></div>
+    <div class="card"><div class="big">{poApp}</div><div class="muted">Playoff appearances in {t.seasons.length} seasons</div></div>
+    {best && <div class="card"><div class="big">{best.W}–{best.L}</div><div class="muted">Best season, <a href={url(`/seasons/${best.yr}/`)}>{best.yr}</a></div></div>}
+    {worst && <div class="card"><div class="big">{worst.W}–{worst.L}</div><div class="muted">Worst season, <a href={url(`/seasons/${worst.yr}/`)}>{worst.yr}</a></div></div>}
+  </div>
+
+  {rosterRows.length > 0 && <><h2>{PUB} roster</h2><StatTable rows={rosterRows} firstCol="Player" secondCol="Pos" totals={false} /></>}
+
+  <h2>Season by season</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Year</th><th>W</th><th>L</th><th>Pct</th><th>Home</th><th>Away</th><th>Div</th><th>Conf</th><th>PF</th><th>PA</th><th>Seed</th><th class="l">Result</th><th>Playoffs</th><th>Pick</th><th class="l">Coach</th></tr></thead>
+    <tbody>{[...t.seasons].reverse().map((s) => { const c = coachIn(s.yr); const res = resultLabel(s.yr, t.id, s.round); return (
+      <tr class={res === 'Won Finals' ? 'hl' : ''}>
+        <td class="l"><a href={url(`/seasons/${s.yr}/`)}>{s.yr}</a></td><td>{s.W}</td><td>{s.L}</td><td>{pct(s.W, s.L)}</td>
+        <td>{s.home.w}–{s.home.l}</td><td>{s.away.w}–{s.away.l}</td><td>{s.div.w}–{s.div.l}</td><td>{s.conf.w}–{s.conf.l}</td>
+        <td>{f1(s.PTS / Math.max(1, s.GP))}</td><td>{f1(s.OPP / Math.max(1, s.GP))}</td><td>{s.seed || ''}</td>
+        <td class="l">{res === 'Won Finals' ? <span>🏆 Won Finals</span> : res}</td>
+        <td>{s.round > 0 ? `${s.po.w}–${s.po.l}` : ''}</td><td>{s.pick || ''}</td>
+        <td class="l small">{c && <a href={url(`/coaches/${c.id}/`)}>{coachName(c.id)}</a>}</td>
+      </tr>
+    ); })}</tbody>
+  </table></div>
+
+  <h2>Franchise leaders</h2>
+  <div class="cards">
+    {([['PTS', 'Points'], ['REB', 'Rebounds'], ['AST', 'Assists'], ['STL', 'Steals'], ['BLK', 'Blocks'], ['TPM', '3-pointers'], ['GP', 'Games played']] as const).map(([k, label]) => (
+      <div class="card"><div class="muted small">{label}</div>
+        <ol style="padding-left:1.2em;margin:.3em 0">{topBy(k).slice(0, 5).map((a) => <li><a href={url(`/players/${a.p.id}/`)}>{a.p.fn} {a.p.ln}</a> <strong>{a.line[k].toLocaleString()}</strong></li>)}</ol>
+      </div>
+    ))}
+  </div>
+
+  <div class="grid">
+    <div>
+      <h2>Retired numbers</h2>
+      {t.retiredNumbers.length ? <ul class="cols">{[...t.retiredNumbers].sort((a, b) => a.yr - b.yr).map((r) => <li><strong>#{r.num}</strong> <a href={url(`/players/${r.pid}/`)}>{playerName(r.pid)}</a> <span class="muted small">{r.yr}</span></li>)}</ul> : <p class="muted small">None.</p>}
+    </div>
+    <div>
+      <h2>Hall of Famers</h2>
+      {hofers.length ? <ul class="cols">{hofers.map((a) => <li><a href={url(`/players/${a.p.id}/`)}>{a.p.fn} {a.p.ln}</a> <span class="muted small">{a.from}–{a.to}, {a.line.PTS.toLocaleString()} pts</span></li>)}</ul> : <p class="muted small">None yet.</p>}
+    </div>
+  </div>
+
+  <h2>All-time roster</h2>
+  <details><summary>{alumni.length} players</summary>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">Player</th><th>Pos</th><th>Years</th><th>Seasons</th><th>GP</th><th>PTS</th><th>REB</th><th>AST</th><th>PPG</th></tr></thead>
+      <tbody>{[...alumni].sort((a, b) => b.line.GP - a.line.GP).map((a) => <tr>
+        <td class="l"><a href={url(`/players/${a.p.id}/`)}>{a.p.fn} {a.p.ln}</a>{a.p.hofYear ? <span class="pill gold">HOF</span> : ''}</td><td>{posName(a.p.pos)}</td><td>{a.from}–{a.to}</td><td>{a.seasons}</td>
+        <td>{a.line.GP}</td><td>{a.line.PTS.toLocaleString()}</td><td>{a.line.REB.toLocaleString()}</td><td>{a.line.AST.toLocaleString()}</td><td>{f1(a.line.PTS / Math.max(1, a.line.GP))}</td>
+      </tr>)}</tbody>
+    </table></div>
+  </details>
+</Base>

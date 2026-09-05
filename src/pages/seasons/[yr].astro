@@ -1,0 +1,148 @@
+---
+import Base from '../../layouts/Base.astro';
+import Bracket from '../../components/Bracket.astro';
+import PlayerLink from '../../components/PlayerLink.astro';
+import TeamLink from '../../components/TeamLink.astro';
+import { years, league, teams, team, teamName, teamAbbr, playerName, player, coachName, awardName, phaseName, pct, f1, fmtPct, url, season as loadSeason, siteConfig, posName } from '../../lib/data';
+export function getStaticPaths() { return years.map((yr) => ({ params: { yr: String(yr) } })); }
+const yr = Number(Astro.params.yr);
+const s = loadSeason(yr);
+const prev = years.includes(yr - 1) ? yr - 1 : null, next = years.includes(yr + 1) ? yr + 1 : null;
+const champ = league.champions.find((c) => c.yr === yr);
+const ep = siteConfig.episodes[String(yr)];
+const conf = (i: number) => s.standings.filter((r) => team(r.tid)?.conference === i);
+const divName = (tid: number) => league.divisions[team(tid)?.division ?? 0] ?? '';
+const coachOf = (tid: number) => s.coaches.find((c) => c.tid === tid);
+const majorAwards = [2, 1, 3, 4, 5, 6];
+const statAwards = [7, 8, 9, 10, 11, 96, 100];
+const allStars = s.awards.filter((a) => a.id === 101);
+const d = s.detail;
+const trades = d?.transactions.filter((t) => t.kind === 'trade') ?? [];
+const moves = d?.transactions.filter((t) => ['signing', 're-signing', 'release', 'free-agent', 'option-exercised', 'contract-expired', 'retirement', 'retired-number', 'coach-hired', 'coach-departed', 'draft', 'extension-eligible', 'coach-note', 'roster-note', 'league-note'].includes(t.kind)) ?? [];
+const injuries = d?.transactions.filter((t) => t.kind === 'injury') ?? [];
+const perfs = d?.transactions.filter((t) => t.kind === 'performance').sort((a, b) => b.rating - a.rating).slice(0, 15) ?? [];
+const gamesByDay = new Map<number, typeof d extends null ? never : NonNullable<typeof d>['games']>();
+for (const g of d?.games ?? []) { if (!gamesByDay.has(g.day)) gamesByDay.set(g.day, []); gamesByDay.get(g.day)!.push(g); }
+const leaderLabel: Record<string, string> = { PTS: 'Points', REB: 'Rebounds', AST: 'Assists', STL: 'Steals', BLK: 'Blocks', TPM: '3-pointers', FGP: 'Field goal %', TPP: '3-point %' };
+const fmtLeader = (k: string, v: number) => (k === 'FGP' || k === 'TPP' ? fmtPct(v) : f1(v));
+const contractStr = (c?: { yrs: number; sal: number; opt: number }) => (c ? `${c.yrs} yr${c.yrs === 1 ? '' : 's'} / $${c.sal}M${c.opt ? ' + option' : ''}` : '');
+---
+<Base title={`${yr} season`}>
+  <p class="small">{prev && <a href={url(`/seasons/${prev}/`)}>← {prev}</a>} &nbsp; <a href={url('/seasons/')}>All seasons</a> &nbsp; {next && <a href={url(`/seasons/${next}/`)}>{next} →</a>}</p>
+  <h1>{yr} {league.name} season</h1>
+  {champ ? (
+    <div class="banner"><strong>Champions:</strong> <a href={url(`/teams/${teamAbbr(champ.tid)}/`)}>{teamName(champ.tid)}</a>, {champ.w}–{champ.l} over <a href={url(`/teams/${teamAbbr(champ.runnerUp)}/`)}>{teamName(champ.runnerUp)}</a> in the Finals.
+      {s.awards.find((a) => a.id === 1) && <span> Finals MVP: <PlayerLink id={s.awards.find((a) => a.id === 1)!.pid} />.</span>}
+      {ep && <span> Documentary: <a href={ep.url}>{ep.title}</a>.</span>}
+    </div>
+  ) : <div class="banner"><strong>Season in progress.</strong> Playoffs have not concluded in the latest records.</div>}
+  <p class="muted small">{s.hasDetail ? 'A full snapshot of this season survives: transactions and game-by-game results are included below.' : 'League records for this season carry standings, playoffs, awards, and statistics. The transaction log and individual game results were not preserved.'}</p>
+
+  <h2>Standings</h2>
+  <div class="grid">
+    {league.conferences.map((cn, ci) => (
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th class="l">{cn}</th><th>W</th><th>L</th><th>Pct</th><th>Home</th><th>Away</th><th>PF</th><th>PA</th><th>Seed</th><th class="l">Result</th><th class="l">Coach</th></tr></thead>
+          <tbody>
+            {conf(ci).map((r) => { const c = coachOf(r.tid); return (
+              <tr class={r.tid === champ?.tid ? 'hl' : ''}>
+                <td class="l"><TeamLink id={r.tid} /> {teamName(r.tid)} <span class="muted small">{divName(r.tid)}</span></td>
+                <td>{r.W}</td><td>{r.L}</td><td>{pct(r.W, r.L)}</td>
+                <td>{r.home.w}–{r.home.l}</td><td>{r.away.w}–{r.away.l}</td>
+                <td>{f1(r.PTS / Math.max(1, r.GP))}</td><td>{f1(r.OPP / Math.max(1, r.GP))}</td>
+                <td>{r.seed || ''}</td>
+                <td class="l small">{r.tid === champ?.tid ? 'Won Finals' : r.tid === champ?.runnerUp ? 'Lost Finals' : r.round > 0 ? `Lost round ${r.round}` : ''}</td>
+                <td class="l small">{c && <a href={url(`/coaches/${c.id}/`)}>{coachName(c.id)}</a>}</td>
+              </tr>
+            ); })}
+          </tbody>
+        </table>
+      </div>
+    ))}
+  </div>
+
+  {s.bracket && <><h2>Playoffs</h2><Bracket bracket={s.bracket} /></>}
+
+  <h2>Awards</h2>
+  <div class="grid">
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">Award</th><th class="l">Player</th><th class="l">Team</th></tr></thead>
+      <tbody>{majorAwards.flatMap((id) => s.awards.filter((a) => a.id === id)).map((a) => <tr><td class="l">{awardName(a.id)}</td><td class="l"><PlayerLink id={a.pid} /></td><td class="l"><TeamLink id={a.tid} /></td></tr>)}</tbody>
+    </table></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th class="l">Title</th><th class="l">Player</th><th class="l">Team</th></tr></thead>
+      <tbody>{statAwards.flatMap((id) => s.awards.filter((a) => a.id === id)).map((a) => <tr><td class="l">{awardName(a.id)}</td><td class="l"><PlayerLink id={a.pid} /></td><td class="l"><TeamLink id={a.tid} /></td></tr>)}</tbody>
+    </table></div>
+  </div>
+  {allStars.length > 0 && <p class="small"><strong>All-Stars:</strong> {allStars.map((a, i) => <span>{i ? ', ' : ''}<PlayerLink id={a.pid} /> ({teamAbbr(a.tid)})</span>)}</p>}
+
+  <h2>League leaders</h2>
+  <div class="cards">
+    {Object.entries(s.leaders).map(([k, list]) => (
+      <div class="card">
+        <div class="muted small">{leaderLabel[k] ?? k}{['FGP', 'TPP'].includes(k) ? '' : ' per game'}</div>
+        <ol style="padding-left:1.2em;margin:.3em 0">{list.slice(0, 5).map((l) => <li><PlayerLink id={l.pid} /> <span class="muted small">{teamAbbr(l.tid)}</span> <strong>{fmtLeader(k, l.value)}</strong></li>)}</ol>
+      </div>
+    ))}
+  </div>
+
+  {trades.length > 0 && <>
+    <h2>Trades</h2>
+    <ul class="plain">{trades.map((t) => <li class="txn"><span class="day">Day {t.day}</span>
+      {t.trade!.map((side, i) => <span>{i ? ' ⇄ ' : ''}<TeamLink id={side.tid} /> send{side.sent.length === 1 ? 's' : ''} {side.sent.map((a, j) => <span>{j ? ', ' : ''}{a.pid ? <PlayerLink id={a.pid} /> : `${a.pick!.yr} round ${a.pick!.rd} pick`}</span>)}</span>)}
+    </li>)}</ul>
+  </>}
+
+  {d && <>
+    <h2>Transactions</h2>
+    <details><summary>{moves.length} roster moves</summary>
+      <ul class="plain">{moves.map((t) => <li class="txn"><span class="day">{phaseName(t.phase).slice(0, 3)} {t.day}</span>
+        {t.tid > 0 && <span><TeamLink id={t.tid} /> </span>}
+        <span class="muted">{t.label}</span> {t.coachId ? <a href={url(`/coaches/${t.coachId}/`)}>{coachName(t.coachId)}</a> : t.pid ? <PlayerLink id={t.pid} /> : ''}
+        {t.contract && <span class="muted small"> · {contractStr(t.contract)}</span>}
+        {t.pick && <span class="muted small"> · pick {t.pick.pk}, round {t.pick.rd}</span>}
+        {t.retiredNumber && <span class="muted small"> · #{t.retiredNumber.num}</span>}
+      </li>)}</ul>
+    </details>
+    <details><summary>{injuries.length} injuries</summary>
+      <ul class="plain">{injuries.map((t) => <li class="txn"><span class="day">Day {t.day}</span><TeamLink id={t.tid} /> <PlayerLink id={t.pid} /> <span class="muted small">out {t.injury?.gamesOut} game{t.injury?.gamesOut === 1 ? '' : 's'}{t.injury?.major ? ' (major)' : ''}</span></li>)}</ul>
+    </details>
+    {perfs.length > 0 && <details><summary>Top performances</summary>
+      <ul class="plain">{perfs.map((t) => { const g = d.games.find((x) => x.gid === t.gid); return <li class="txn"><span class="day">Day {t.day}</span><PlayerLink id={t.pid} /> ({teamAbbr(t.tid)}) <strong>{t.rating}</strong> <span class="muted small">{g && `${teamAbbr(g.away)} ${g.as} @ ${teamAbbr(g.home)} ${g.hs}`}</span></li>; })}</ul>
+    </details>}
+    <details><summary>Game log ({d.games.length} games)</summary>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Day</th><th class="l">Away</th><th></th><th class="l">Home</th><th></th><th class="l">Player of the game</th><th>Note</th></tr></thead>
+        <tbody>{[...gamesByDay.entries()].map(([day, games]) => games.map((g) => <tr>
+          <td>{day + 1}</td>
+          <td class="l"><TeamLink id={g.away} /> <span class="muted small">{g.awayRec[0]}–{g.awayRec[1]}</span></td><td class={g.winner === g.away ? 'w' : ''}><strong>{g.winner === g.away ? g.as : ''}</strong>{g.winner !== g.away ? g.as : ''}</td>
+          <td class="l"><TeamLink id={g.home} /> <span class="muted small">{g.homeRec[0]}–{g.homeRec[1]}</span></td><td><strong>{g.winner === g.home ? g.hs : ''}</strong>{g.winner !== g.home ? g.hs : ''}</td>
+          <td class="l">{g.potg ? <PlayerLink id={g.potg} /> : ''}</td>
+          <td class="small muted">{g.periods > 4 ? `${g.periods - 4}OT` : ''}</td>
+        </tr>))}</tbody>
+      </table></div>
+    </details>
+  </>}
+
+  <h2>Draft</h2>
+  {s.draft.length ? <div class="tablewrap"><table>
+    <thead><tr><th>Pick</th><th>Rd</th><th class="l">Player</th><th>Pos</th><th class="l">Team</th><th class="l">Career</th></tr></thead>
+    <tbody>{s.draft.map((p) => { const pl = player(p.pid); const yrs = pl?.seasons.length ?? 0; const aw = pl?.awards.reduce((n, a) => n + a.years.length, 0) ?? 0; return (
+      <tr><td>{p.pk}</td><td>{p.rd}</td><td class="l"><PlayerLink id={p.pid} />{pl?.hofYear ? <span class="pill gold">HOF</span> : ''}</td><td>{posName(pl?.pos ?? 0)}</td><td class="l"><TeamLink id={p.tid} /></td><td class="l small muted">{yrs} season{yrs === 1 ? '' : 's'}{aw ? `, ${aw} award${aw === 1 ? '' : 's'}` : ''}</td></tr>
+    ); })}</tbody>
+  </table></div> : <p class="muted small">No draft records for this year.</p>}
+
+  <div class="grid">
+    <div>
+      <h2>Retirements</h2>
+      {s.retirements.length ? <ul class="cols">{s.retirements.map((pid) => { const pl = player(pid)!; return <li><PlayerLink id={pid} /> <span class="muted small">{pl.seasons.length} seasons{pl.hofYear ? ', Hall of Fame' : ''}</span></li>; })}</ul> : <p class="muted small">None on record.</p>}
+    </div>
+    <div>
+      <h2>Honors</h2>
+      {s.hof.length > 0 && <p><strong>Hall of Fame class:</strong> {s.hof.map((pid, i) => <span>{i ? ', ' : ''}<PlayerLink id={pid} /></span>)}</p>}
+      {s.retiredNumbers.length > 0 && <p><strong>Numbers retired:</strong> {s.retiredNumbers.map((r, i) => <span>{i ? ', ' : ''}<TeamLink id={r.tid} /> #{r.num} <PlayerLink id={r.pid} /></span>)}</p>}
+      {!s.hof.length && !s.retiredNumbers.length && <p class="muted small">None this year.</p>}
+    </div>
+  </div>
+</Base>

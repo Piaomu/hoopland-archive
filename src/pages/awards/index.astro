@@ -1,0 +1,27 @@
+---
+import Base from '../../layouts/Base.astro';
+import { league, players, playerName, teamAbbr, awardName, url, playerTeamIn } from '../../lib/data';
+const ids = [2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 96, 100];
+const byAward = new Map<number, { yr: number; pid: number; tid: number }[]>();
+for (const p of players) for (const a of p.awards) for (const yr of a.years) {
+  if (!byAward.has(a.id)) byAward.set(a.id, []);
+  byAward.get(a.id)!.push({ yr, pid: p.id, tid: playerTeamIn(p, yr) });
+}
+for (const list of byAward.values()) list.sort((a, b) => b.yr - a.yr);
+const counts = (id: number) => { const m = new Map<number, number>(); for (const w of byAward.get(id) ?? []) m.set(w.pid, (m.get(w.pid) ?? 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5); };
+---
+<Base title="Awards">
+  <h1>Awards</h1>
+  <p class="muted">Every winner of every league award, newest first.</p>
+  {ids.filter((id) => byAward.has(id)).map((id) => (
+    <section>
+      <h2>{awardName(id)}</h2>
+      <p class="small"><strong>Most wins:</strong> {counts(id).map(([pid, n], i) => <span>{i ? ', ' : ''}<a href={url(`/players/${pid}/`)}>{playerName(pid)}</a> ({n})</span>)}</p>
+      <details><summary>All winners ({byAward.get(id)!.length})</summary>
+        <ul class="cols plain">{byAward.get(id)!.map((w) => <li><a href={url(`/seasons/${w.yr}/`)}>{w.yr}</a> <a href={url(`/players/${w.pid}/`)}>{playerName(w.pid)}</a> <span class="muted small">{teamAbbr(w.tid)}</span></li>)}</ul>
+      </details>
+    </section>
+  ))}
+  <h2>Hall of Fame</h2>
+  <ul class="cols plain">{players.filter((p) => p.hofYear).sort((a, b) => a.hofYear - b.hofYear || a.ln.localeCompare(b.ln)).map((p) => <li>{p.hofYear} <a href={url(`/players/${p.id}/`)}>{p.fn} {p.ln}</a></li>)}</ul>
+</Base>

@@ -1,0 +1,51 @@
+---
+import Base from '../../layouts/Base.astro';
+import StatTable from '../../components/StatTable.astro';
+import { players, teams, league, teamAbbr, teamName, collegeName, awardName, posName, height, url, sumRows, PUB } from '../../lib/data';
+export function getStaticPaths() { return players.map((p) => ({ params: { id: String(p.id) } })); }
+const p = players.find((x) => x.id === Number(Astro.params.id))!;
+const rows = p.seasons.flatMap((s) => s.rows.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/`), line: r, hl: league.champions.some((c) => c.yr === s.yr && c.tid === r.tid) })));
+const poRows = p.seasons.flatMap((s) => s.po.map((r) => ({ label: String(s.yr), href: url(`/seasons/${s.yr}/`), sub: teamAbbr(r.tid), subHref: url(`/teams/${teamAbbr(r.tid)}/`), line: r })));
+const career = sumRows(p.seasons.flatMap((s) => s.rows));
+const from = p.seasons[0]?.yr, to = p.seasons.at(-1)?.yr;
+const active = !p.yearRetired && to === PUB;
+const titles = league.champions.filter((c) => c.yr <= PUB && p.seasons.some((s) => s.yr === c.yr && s.rows.some((r) => r.tid === c.tid)));
+const numbers = teams.flatMap((t) => t.retiredNumbers.filter((r) => r.pid === p.id).map((r) => ({ t, r })));
+const awardRows = p.awards.map((a) => ({ name: awardName(a.id), years: [...a.years].sort() })).sort((a, b) => b.years.length - a.years.length);
+const collegeLine = p.college.length ? sumRows(p.college.flatMap((s) => s.rows)) : null;
+const currentTeam = to === PUB ? p.seasons.at(-1)!.rows.at(-1)!.tid : 0;
+---
+<Base title={`${p.fn} ${p.ln}`}>
+  <h1>{p.fn} {p.ln} {p.hofYear ? <span class="pill gold">Hall of Fame {p.hofYear}</span> : ''}</h1>
+  <p class="muted">
+    {posName(p.pos)} · {height(p.ht)}, {p.wt} lb · {p.ctry}{p.arc ? ` · ${p.arc}` : ''}
+    {from ? ` · ${from}–${active ? 'present' : to}` : ''}
+    {currentTeam ? <span> · <a href={url(`/teams/${teamAbbr(currentTeam)}/`)}>{teamName(currentTeam)}</a></span> : ''}
+  </p>
+  <p class="small">
+    {p.draft ? <span>Drafted {p.draft.yr}, round {p.draft.rd} pick {p.draft.pk} by <a href={url(`/teams/${teamAbbr(p.draft.tid)}/`)}>{teamName(p.draft.tid)}</a>{p.collegeTid && collegeName(p.collegeTid) ? ` out of ${collegeName(p.collegeTid)}` : ''}. </span> : <span>Undrafted. </span>}
+    {p.yearRetired ? <span>Retired {p.yearRetired}. </span> : ''}
+    {p.causeOfDeath > 0 && p.yearRetired ? <span class="muted">Deceased. </span> : ''}
+    {p.recoveredFrom ? <span class="muted">Record recovered from the {p.recoveredFrom} league files. </span> : ''}
+  </p>
+
+  <div class="cards">
+    <div class="card"><div class="big">{career.GP}</div><div class="muted">Games</div></div>
+    <div class="card"><div class="big">{(career.PTS / Math.max(1, career.GP)).toFixed(1)}</div><div class="muted">PPG · {career.PTS.toLocaleString()} points</div></div>
+    <div class="card"><div class="big">{(career.REB / Math.max(1, career.GP)).toFixed(1)}</div><div class="muted">RPG · {career.REB.toLocaleString()} rebounds</div></div>
+    <div class="card"><div class="big">{(career.AST / Math.max(1, career.GP)).toFixed(1)}</div><div class="muted">APG · {career.AST.toLocaleString()} assists</div></div>
+    <div class="card"><div class="big">{titles.length}</div><div class="muted">Championship{titles.length === 1 ? '' : 's'}{titles.length ? ': ' + titles.map((c) => c.yr).join(', ') : ''}</div></div>
+    <div class="card"><div class="big">{p.awards.reduce((n, a) => n + a.years.length, 0)}</div><div class="muted">Awards and honors</div></div>
+  </div>
+
+  {awardRows.length > 0 && <><h2>Awards</h2><ul class="cols plain">{awardRows.map((a) => <li><strong>{a.name}</strong> ×{a.years.length} <span class="muted small">{a.years.join(', ')}</span></li>)}</ul></>}
+  {numbers.length > 0 && <p><strong>Retired number:</strong> {numbers.map((n, i) => <span>{i ? ', ' : ''}#{n.r.num} by <a href={url(`/teams/${n.t.abbr}/`)}>{teamName(n.t.id)}</a> ({n.r.yr})</span>)}</p>}
+
+  <h2>Regular season</h2>
+  {rows.length ? <StatTable rows={rows} /> : <p class="muted small">No regular-season statistics on record.</p>}
+  {poRows.length > 0 && <><h2>Playoffs</h2><StatTable rows={poRows} /></>}
+
+  {(p.highs.PTS || 0) > 0 && <><h2>Career highs</h2><p class="small">Points {p.highs.PTS} · Rebounds {p.highs.REB} · Assists {p.highs.AST} · Steals {p.highs.STL} · Blocks {p.highs.BLK} · 3-pointers {p.highs.TPM}</p></>}
+  {collegeLine && <><h2>College</h2><p class="small">{p.college.map((s) => s.yr).join(', ')} at {collegeName(p.college[0].rows[0]?.tid ?? 0) || 'college'}: {collegeLine.GP} games, {(collegeLine.PTS / Math.max(1, collegeLine.GP)).toFixed(1)} ppg, {(collegeLine.REB / Math.max(1, collegeLine.GP)).toFixed(1)} rpg, {(collegeLine.AST / Math.max(1, collegeLine.GP)).toFixed(1)} apg.</p></>}
+  {p.injuries.filter((i) => i.gamesOut > 0 && i.yr <= PUB).length > 0 && <><h2>Injury history</h2><ul class="plain small">{p.injuries.filter((i) => i.gamesOut > 0 && i.yr <= PUB).map((i) => <li class="txn">{i.yr} · missed {i.gamesOut} game{i.gamesOut === 1 ? '' : 's'} at age {i.age}{i.major ? ' (major)' : ''}</li>)}</ul></>}
+</Base>

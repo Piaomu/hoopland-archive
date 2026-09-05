@@ -1,0 +1,31 @@
+---
+import { teamAbbr, url, season as loadSeason } from '../lib/data';
+import type { PlayoffYear } from '../../ingest/schema';
+interface Props { bracket: PlayoffYear }
+const { bracket } = Astro.props;
+const s = loadSeason(bracket.yr);
+const seedOf = (tid: number) => s.standings.find((x) => x.tid === tid)?.seed || '';
+const names = ['First round', 'Second round', 'Conference finals', 'Finals'];
+const n = bracket.rounds.length;
+const label = (i: number) => (n === 4 ? names[i] : i === n - 1 ? 'Finals' : `Round ${i + 1}`);
+---
+<div class="bracket">
+  {bracket.rounds.map((round, i) => (
+    <div class="round">
+      <h4>{label(i)}</h4>
+      {round.map((sr) => {
+        const wins = (tid: number) => (tid === sr.winner ? sr.firstTo : sr.games - sr.firstTo);
+        return (
+          <div class="series">
+            {[sr.top, sr.low].map((tid) => (
+              <div class={tid === sr.winner ? 'w' : ''}>
+                <span><span class="seed">{seedOf(tid)}</span><a href={url(`/teams/${teamAbbr(tid)}/`)}>{teamAbbr(tid)}</a></span>
+                <span>{wins(tid)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  ))}
+</div>

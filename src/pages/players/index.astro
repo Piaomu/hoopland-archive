@@ -1,0 +1,26 @@
+---
+import Base from '../../layouts/Base.astro';
+import { playersIndex, teamAbbr, posName, url, f1 } from '../../lib/data';
+const sorted = [...playersIndex].sort((a, b) => a.ln.localeCompare(b.ln) || a.fn.localeCompare(b.fn));
+const letters = [...new Set(sorted.map((p) => (p.ln[0] ?? '?').toUpperCase()))].sort();
+const top = [...playersIndex].sort((a, b) => b.PTS - a.PTS).slice(0, 25);
+---
+<Base title="Players">
+  <h1>Players</h1>
+  <p class="muted">{playersIndex.length.toLocaleString()} players on record.</p>
+
+  <h2>Career scoring leaders</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>#</th><th class="l">Player</th><th>Pos</th><th>Years</th><th>GP</th><th>PTS</th><th>PPG</th><th>REB</th><th>AST</th><th>Awards</th></tr></thead>
+    <tbody>{top.map((p, i) => <tr><td>{i + 1}</td><td class="l"><a href={url(`/players/${p.id}/`)}>{p.fn} {p.ln}</a>{p.hof ? <span class="pill gold">HOF</span> : ''}</td><td>{posName(p.pos)}</td><td>{p.from}–{p.to}</td><td>{p.GP}</td><td>{p.PTS.toLocaleString()}</td><td>{f1(p.PTS / Math.max(1, p.GP))}</td><td>{p.REB.toLocaleString()}</td><td>{p.AST.toLocaleString()}</td><td>{p.awards}</td></tr>)}</tbody>
+  </table></div>
+
+  <h2>All players</h2>
+  <p class="letters">{letters.map((L) => <a href={`#${L}`}>{L}</a>)}</p>
+  {letters.map((L) => (
+    <section>
+      <h3 id={L}>{L}</h3>
+      <ul class="cols plain">{sorted.filter((p) => (p.ln[0] ?? '?').toUpperCase() === L).map((p) => <li><a href={url(`/players/${p.id}/`)}>{p.ln}, {p.fn}</a> <span class="muted small">{posName(p.pos)} {p.from ? `${p.from}–${p.to}` : ''} {p.tids.slice(0, 3).map(teamAbbr).join('/')}{p.hof ? ' ★' : ''}</span></li>)}</ul>
+    </section>
+  ))}
+</Base>

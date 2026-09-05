@@ -1,0 +1,18 @@
+---
+import Base from '../../layouts/Base.astro';
+import { teams, league, teamName, pct, url } from '../../lib/data';
+const byConf = (ci: number) => teams.filter((t) => t.conference === ci).sort((a, b) => a.division - b.division || a.name.localeCompare(b.name));
+---
+<Base title="Franchises">
+  <h1>Franchises</h1>
+  <div class="grid">
+    {league.conferences.map((cn, ci) => (
+      <div class="tablewrap"><table>
+        <thead><tr><th class="l">{cn}</th><th class="l">Division</th><th>Since</th><th>W</th><th>L</th><th>Pct</th><th>Titles</th></tr></thead>
+        <tbody>{byConf(ci).map((t) => { const w = t.seasons.reduce((n, s) => n + s.W, 0), l = t.seasons.reduce((n, s) => n + s.L, 0); return (
+          <tr><td class="l"><span class="swatch" style={`background:#${t.colors[0] ?? '888'}`}></span><a href={url(`/teams/${t.abbr}/`)}>{teamName(t.id)}</a></td><td class="l">{league.divisions[t.division]}</td><td>{t.firstYear}</td><td>{w}</td><td>{l}</td><td>{pct(w, l)}</td><td>{t.titles.length}</td></tr>
+        ); })}</tbody>
+      </table></div>
+    ))}
+  </div>
+</Base>

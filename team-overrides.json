@@ -1,0 +1,5 @@
+{
+  "_comment": "Presentation overrides keyed by team abbreviation, for fields the save file leaves blank (e.g. city for teams with custom logos).",
+  "HAV": { "city": "Havana" },
+  "WIC": { "city": "Wichita" }
+}

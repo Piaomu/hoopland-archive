@@ -1,0 +1,25 @@
+---
+import Base from '../../layouts/Base.astro';
+import { coaches, league, teamAbbr, teamName, resultLabel, pct, url } from '../../lib/data';
+export function getStaticPaths() { return coaches.map((c) => ({ params: { id: String(c.id) } })); }
+const c = coaches.find((x) => x.id === Number(Astro.params.id))!;
+const w = c.tenures.reduce((n, t) => n + t.W, 0), l = c.tenures.reduce((n, t) => n + t.L, 0);
+const pw = c.tenures.reduce((n, t) => n + t.po.w, 0), pl = c.tenures.reduce((n, t) => n + t.po.l, 0);
+const titles = c.tenures.filter((t) => league.champions.some((x) => x.yr === t.yr && x.tid === t.tid)).map((t) => t.yr);
+---
+<Base title={`${c.fn} ${c.ln}`}>
+  <h1>{c.fn} {c.ln}</h1>
+  <p class="muted">Head coach · {c.ctry} · {c.tenures[0].yr}–{c.yearRetired ? c.yearRetired : c.tenures.at(-1)!.yr}{c.yearRetired ? ' (retired)' : ''}</p>
+  <div class="cards">
+    <div class="card"><div class="big">{w}–{l}</div><div class="muted">Regular season ({pct(w, l)})</div></div>
+    <div class="card"><div class="big">{pw}–{pl}</div><div class="muted">Playoffs</div></div>
+    <div class="card"><div class="big">{titles.length}</div><div class="muted">Championship{titles.length === 1 ? '' : 's'}{titles.length ? ': ' + titles.join(', ') : ''}</div></div>
+  </div>
+  <h2>Coaching record</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Year</th><th class="l">Team</th><th>W</th><th>L</th><th>Pct</th><th>Playoffs</th><th class="l">Result</th></tr></thead>
+    <tbody>{[...c.tenures].reverse().map((t) => { const res = resultLabel(t.yr, t.tid, t.round); return (
+      <tr class={res === 'Won Finals' ? 'hl' : ''}><td class="l"><a href={url(`/seasons/${t.yr}/`)}>{t.yr}</a></td><td class="l"><a href={url(`/teams/${teamAbbr(t.tid)}/`)}>{teamName(t.tid)}</a></td><td>{t.W}</td><td>{t.L}</td><td>{pct(t.W, t.L)}</td><td>{t.po.w + t.po.l ? `${t.po.w}–${t.po.l}` : ''}</td><td class="l">{res}</td></tr>
+    ); })}</tbody>
+  </table></div>
+</Base>

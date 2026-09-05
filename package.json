@@ -1,0 +1,25 @@
+{
+  "name": "hoopland-archive",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Historical archive site for a Hoop Land commissioner league, built from season save-file snapshots.",
+  "scripts": {
+    "ingest": "node --max-old-space-size=8192 --import tsx ingest/cli.ts ingest",
+    "inbox": "node --max-old-space-size=8192 --import tsx ingest/cli.ts inbox",
+    "rebuild": "node --max-old-space-size=8192 --import tsx ingest/cli.ts rebuild",
+    "watch": "node --max-old-space-size=8192 --import tsx ingest/cli.ts watch",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "astro": "^7.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.3"
+  }
+}

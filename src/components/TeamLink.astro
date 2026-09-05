@@ -1,0 +1,6 @@
+---
+import { teamAbbr, url } from '../lib/data';
+interface Props { id: number }
+const { id } = Astro.props;
+---
+<a href={url(`/teams/${teamAbbr(id)}/`)}>{teamAbbr(id)}</a>
