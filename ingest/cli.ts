@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { parseSave } from './parse-save.js';
 import { mergeAll } from './merge.js';
@@ -68,10 +69,52 @@ function processInbox(): number {
   return files.length;
 }
 
+// status: machine-readable view of the inbox for an automation (OpenClaw heartbeat) to act on.
+function status(): { pending: { file: string; mb: number; stable: boolean; ageMinutes: number }[]; snapshots: number[] } {
+  const files = fs.existsSync(cfg.inbox) ? fs.readdirSync(cfg.inbox).map((f) => path.join(cfg.inbox, f)).filter((f) => fs.statSync(f).isFile()) : [];
+  const pending = files.map((f) => {
+    const st = fs.statSync(f);
+    return { file: path.basename(f), mb: +(st.size / 1e6).toFixed(1), stable: st.size > 1000 && Date.now() - st.mtimeMs > 5000, ageMinutes: Math.round((Date.now() - st.mtimeMs) / 60000) };
+  });
+  const snapshots = fs.existsSync(cfg.snapshots) ? fs.readdirSync(cfg.snapshots).map((f) => Number(f.match(/_(\d{4})\.json/)?.[1])).filter(Boolean).sort((a, b) => a - b) : [];
+  return { pending, snapshots };
+}
+
+// publish: ingest the inbox, commit the merged data, push, and report the deploy. Used after the user says yes.
+function sh(cmd: string, args: string[]): string {
+  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+  if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed: ${(r.stderr || r.stdout || '').trim().slice(0, 500)}`);
+  return (r.stdout || '').trim();
+}
+function publish() {
+  const before = status();
+  if (!before.pending.length) { log('nothing to publish: inbox is empty'); return; }
+  const unstable = before.pending.filter((p) => !p.stable);
+  if (unstable.length) { log(`waiting: ${unstable.map((p) => p.file).join(', ')} still syncing`); return; }
+  const n = processInbox();
+  const after = status();
+  const added = after.snapshots.filter((y) => !before.snapshots.includes(y));
+  sh('git', ['add', 'data']);
+  const changed = sh('git', ['status', '--porcelain', 'data']);
+  if (!changed) { log(`ingested ${n} file(s) but data/ is unchanged; nothing to push`); return; }
+  const label = added.length ? `Add ${added.join(', ')} season snapshot${added.length > 1 ? 's' : ''}` : 'Refresh season snapshot data';
+  sh('git', ['commit', '-q', '-m', label]);
+  sh('git', ['push', '-q', 'origin', 'main']);
+  log(`pushed: ${label}`);
+  try {
+    const runs = JSON.parse(sh('gh', ['run', 'list', '--limit', '1', '--json', 'databaseId,url']));
+    if (runs[0]) { log(`deploy started: ${runs[0].url}`); sh('gh', ['run', 'watch', String(runs[0].databaseId), '--exit-status', '--interval', '10']); log('deploy finished'); }
+  } catch (e) { log(`deploy status unavailable: ${(e as Error).message.split('\n')[0]}`); }
+  const site = 'https://piaomu.github.io/hoopland-archive/';
+  log(`live: ${site}${added.length ? ` (new: ${added.map((y) => `${site}seasons/${y}/`).join(' ')})` : ''}`);
+}
+
 const [cmd, arg] = process.argv.slice(2);
 switch (cmd) {
   case 'ingest': { if (!arg) throw new Error('usage: ingest <file>'); ingestFile(path.resolve(arg)); rebuild(); break; }
   case 'inbox': { const n = processInbox(); log(n ? `ingested ${n} file(s)` : 'inbox empty'); break; }
+  case 'status': { const s = status(); console.log(JSON.stringify(s)); break; }
+  case 'publish': publish(); break;
   case 'rebuild': rebuild(); break;
   case 'watch': {
     log(`watching ${cfg.inbox} every ${cfg.watchIntervalSeconds}s`);

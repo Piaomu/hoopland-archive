@@ -12,7 +12,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "status": "node --import tsx ingest/cli.ts status",
+    "publish": "node --max-old-space-size=8192 --import tsx ingest/cli.ts publish"
   },
   "dependencies": {
     "astro": "^7.3.1"
