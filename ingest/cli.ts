@@ -82,17 +82,21 @@ function status(): { pending: { file: string; mb: number; stable: boolean; ageMi
 
 // publish: ingest the inbox, commit the merged data, push, and report the deploy. Used after the user says yes.
 function sh(cmd: string, args: string[]): string {
-  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' });
+  const r = spawnSync(cmd, args, { cwd: root, encoding: 'utf8' });
   if (r.status !== 0) throw new Error(`${cmd} ${args.join(' ')} failed: ${(r.stderr || r.stdout || '').trim().slice(0, 500)}`);
   return (r.stdout || '').trim();
 }
 function publish() {
   const before = status();
-  if (!before.pending.length) { log('nothing to publish: inbox is empty'); return; }
+  let n = 0;
+  let after = before;
+  if (!before.pending.length) log('inbox is empty; checking for rebuilt data to publish');
   const unstable = before.pending.filter((p) => !p.stable);
   if (unstable.length) { log(`waiting: ${unstable.map((p) => p.file).join(', ')} still syncing`); return; }
-  const n = processInbox();
-  const after = status();
+  if (before.pending.length) {
+    n = processInbox();
+    after = status();
+  }
   const added = after.snapshots.filter((y) => !before.snapshots.includes(y));
   sh('git', ['add', 'data']);
   const changed = sh('git', ['status', '--porcelain', 'data']);
