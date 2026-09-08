@@ -98,8 +98,18 @@ function publish() {
     after = status();
   }
   const added = after.snapshots.filter((y) => !before.snapshots.includes(y));
-  sh('git', ['add', 'data']);
-  const changed = sh('git', ['status', '--porcelain', 'data']);
+  if (added.length) {
+    const sitePath = path.join(root, 'site.config.json');
+    const site = JSON.parse(fs.readFileSync(sitePath, 'utf8')) as { publishedThroughYear?: number };
+    const latestAdded = Math.max(...added);
+    if ((site.publishedThroughYear ?? 0) < latestAdded) {
+      site.publishedThroughYear = latestAdded;
+      fs.writeFileSync(sitePath, `${JSON.stringify(site, null, 2)}\n`);
+      log(`publishing site through ${latestAdded}`);
+    }
+  }
+  sh('git', ['add', 'data', 'site.config.json']);
+  const changed = sh('git', ['status', '--porcelain', 'data', 'site.config.json']);
   if (!changed) { log(`ingested ${n} file(s) but data/ is unchanged; nothing to push`); return; }
   const label = added.length ? `Add ${added.join(', ')} season snapshot${added.length > 1 ? 's' : ''}` : 'Refresh season snapshot data';
   sh('git', ['commit', '-q', '-m', label]);
