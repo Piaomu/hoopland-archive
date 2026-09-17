@@ -54,7 +54,15 @@ function mergePlayers(extracts: Extract[]): Player[] {
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
-function buildSeason(yr: number, base: Extract, players: Player[], detail: SeasonDetail | null): SeasonFile {
+// Coaches are unioned the same way: the newest snapshot wins, older snapshots recover coaches the
+// game has since purged from its pool.
+function mergeCoaches(extracts: Extract[]): Coach[] {
+  const byId = new Map<number, Coach>();
+  for (const ex of extracts) for (const c of ex.coaches) if (!byId.has(c.id)) byId.set(c.id, c);
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+function buildSeason(yr: number, base: Extract, players: Player[], coaches: Coach[], detail: SeasonDetail | null): SeasonFile {
   const standings = base.teams.flatMap((t) => {
     const s = t.seasons.find((x) => x.yr === yr);
     return s ? [{ tid: t.id, ...s }] : [];
@@ -96,9 +104,9 @@ function buildSeason(yr: number, base: Extract, players: Player[], detail: Seaso
     .map((t) => ({ pid: t.pid, tid: t.tid, value: t.line.TPM / t.line.TPA, GP: t.line.GP })).sort((a, b) => b.value - a.value).slice(0, 10);
 
   const retiredNumbers = base.teams.flatMap((t) => t.retiredNumbers.filter((r) => r.yr === yr).map((r) => ({ tid: t.id, num: r.num, pid: r.pid })));
-  const coaches = base.coaches.flatMap((c) => c.tenures.filter((t) => t.yr === yr).map((t) => ({ id: c.id, tid: t.tid, W: t.W, L: t.L })));
+  const seasonCoaches = coaches.flatMap((c) => c.tenures.filter((t) => t.yr === yr).map((t) => ({ id: c.id, tid: t.tid, W: t.W, L: t.L })));
 
-  return { yr, complete, hasDetail: !!detail, champion, runnerUp, standings, bracket, awards, leaders, draft, retirements, hof, retiredNumbers, coaches, detail };
+  return { yr, complete, hasDetail: !!detail, champion, runnerUp, standings, bracket, awards, leaders, draft, retirements, hof, retiredNumbers, coaches: seasonCoaches, detail };
 }
 
 export function mergeAll(extractsDir: string, dataDir: string): { years: number[]; snapshots: number[] } {
@@ -106,6 +114,7 @@ export function mergeAll(extractsDir: string, dataDir: string): { years: number[
   if (!extracts.length) throw new Error(`No extracts found in ${extractsDir}`);
   const base = extracts[0];
   const players = mergePlayers(extracts);
+  const coaches = mergeCoaches(extracts);
   const detailByYear = new Map<number, SeasonDetail>();
   for (const ex of extracts) if (!detailByYear.has(ex.detail.yr)) detailByYear.set(ex.detail.yr, ex.detail);
 
@@ -113,7 +122,7 @@ export function mergeAll(extractsDir: string, dataDir: string): { years: number[
   const years: number[] = [];
   const champions: { yr: number; tid: number; runnerUp: number; w: number; l: number }[] = [];
   for (let yr = base.league.startingYear; yr <= base.snapshotYear; yr++) {
-    const season = buildSeason(yr, base, players, detailByYear.get(yr) ?? null);
+    const season = buildSeason(yr, base, players, coaches, detailByYear.get(yr) ?? null);
     writeJson(path.join(dataDir, 'seasons', `${yr}.json`), season);
     years.push(yr);
     if (season.complete && season.bracket) {
@@ -132,7 +141,7 @@ export function mergeAll(extractsDir: string, dataDir: string): { years: number[
     return { id: p.id, fn: p.fn, ln: p.ln, pos: p.pos, from: yrs[0] ?? 0, to: yrs.at(-1) ?? 0, tids, hof: p.hofYear > 0,
       GP: career.GP, PTS: career.PTS, REB: career.REB, AST: career.AST, awards: p.awards.reduce((n, a) => n + a.years.length, 0) };
   }));
-  writeJson(path.join(dataDir, 'coaches.json'), base.coaches);
+  writeJson(path.join(dataDir, 'coaches.json'), coaches);
   writeJson(path.join(dataDir, 'records.json'), base.records);
   writeJson(path.join(dataDir, 'league.json'), {
     name: base.league.name, shortName: base.league.shortName, startingYear: base.league.startingYear,

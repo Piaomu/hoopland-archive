@@ -98,17 +98,38 @@ function parsePlayers(L: Raw): Player[] {
   return out;
 }
 
-function parseCoaches(L: Raw): Coach[] {
-  return (L.coaches ?? []).map((c: Raw): Coach => ({
+function parseCoach(c: Raw): Coach {
+  const tenures: CoachTenure[] = [];
+  const seen = new Set<string>();
+  for (const h of c.career?.teamHistory ?? []) {
+    const s = h.season?.[0] ?? {};
+    const t: CoachTenure = { yr: h.yr, tid: s.tid ?? -1, W: s.W ?? 0, L: s.L ?? 0, rank: h.rank ?? 0, round: h.round ?? 0,
+      po: { w: h.playoffs?.W ?? 0, l: h.playoffs?.L ?? 0 }, fin: { w: h.finals?.W ?? 0, l: h.finals?.L ?? 0 } };
+    // The game logs an offseason hire as a 0-0 year with the new team, and sometimes logs it twice.
+    // Keep those out so a coach is not credited with a season someone else coached.
+    if (t.tid > 0 && t.W + t.L + t.po.w + t.po.l === 0) continue;
+    const key = `${t.yr}:${t.tid}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    tenures.push(t);
+  }
+  return {
     id: c.id, fn: c.fn, ln: c.ln, ctry: c.ctry ?? '', age: c.age, tid: c.tid, status: c.status,
     yearRetired: c.yearRetired ?? 0,
     awards: (c.awards ?? []).filter((a: Raw) => a.league === 0).map((a: Raw) => ({ id: a.id, years: [...a.yearsWon] })),
-    tenures: (c.career?.teamHistory ?? []).map((h: Raw): CoachTenure => {
-      const s = h.season?.[0] ?? {};
-      return { yr: h.yr, tid: s.tid ?? -1, W: s.W ?? 0, L: s.L ?? 0, rank: h.rank ?? 0, round: h.round ?? 0,
-        po: { w: h.playoffs?.W ?? 0, l: h.playoffs?.L ?? 0 }, fin: { w: h.finals?.W ?? 0, l: h.finals?.L ?? 0 } };
-    }),
-  }));
+    tenures,
+  };
+}
+
+// Employed coaches live under each team's front office (staff pos 1 is the head coach); the
+// league-level `coaches` list holds only the unemployed and retired pool. Read both, team first.
+function parseCoaches(L: Raw): Coach[] {
+  const byId = new Map<number, Coach>();
+  for (const t of L.teams ?? []) for (const s of t.frontOffice?.staff ?? []) {
+    if (s?.id > 0 && s.pos === 1 && !byId.has(s.id)) byId.set(s.id, parseCoach(s));
+  }
+  for (const c of L.coaches ?? []) if (!byId.has(c.id)) byId.set(c.id, parseCoach(c));
+  return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
 function parseRecords(L: Raw): RecordsBook {
