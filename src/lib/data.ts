@@ -54,8 +54,9 @@ export const team = (id: number) => teamMap.get(id);
 export const player = (id: number) => playerMap.get(id);
 export const coach = (id: number) => coachMap.get(id);
 const cap = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
-// City is often blank in the save; the built-in logo slug ("atlanta") is a usable fallback, a custom logo URL is not.
-export const teamCity = (t: Team) => t.city || (/^[a-z]+$/.test(t.logo) ? cap(t.logo) : '');
+// City is often blank in the save; the built-in logo slug is a usable fallback, a custom logo URL is not.
+// Slugs are lowercase words joined by underscores ("atlanta", "oklahoma_city", "san_francisco").
+export const teamCity = (t: Team) => t.city || (/^[a-z]+(_[a-z]+)*$/.test(t.logo) ? t.logo.split('_').map(cap).join(' ') : '');
 export const teamName = (id: number) => { const t = teamMap.get(id); return t ? `${teamCity(t)} ${t.name}`.trim() : `Team ${id}`; };
 export const teamAbbr = (id: number) => teamMap.get(id)?.abbr ?? `T${id}`;
 export const playerName = (id: number) => { const p = playerMap.get(id); return p ? `${p.fn} ${p.ln}` : `Unknown player`; };

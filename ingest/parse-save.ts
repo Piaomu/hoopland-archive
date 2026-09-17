@@ -105,9 +105,12 @@ function parseCoach(c: Raw): Coach {
     const s = h.season?.[0] ?? {};
     const t: CoachTenure = { yr: h.yr, tid: s.tid ?? -1, W: s.W ?? 0, L: s.L ?? 0, rank: h.rank ?? 0, round: h.round ?? 0,
       po: { w: h.playoffs?.W ?? 0, l: h.playoffs?.L ?? 0 }, fin: { w: h.finals?.W ?? 0, l: h.finals?.L ?? 0 } };
+    // Years spent out of coaching are logged against team 0 (or -1 when no team block exists at all);
+    // they carry no record, so they are not tenures. Gaps between years show the time away.
+    if (t.tid <= 0) continue;
     // The game logs an offseason hire as a 0-0 year with the new team, and sometimes logs it twice.
     // Keep those out so a coach is not credited with a season someone else coached.
-    if (t.tid > 0 && t.W + t.L + t.po.w + t.po.l === 0) continue;
+    if (t.W + t.L + t.po.w + t.po.l === 0) continue;
     const key = `${t.yr}:${t.tid}`;
     if (seen.has(key)) continue;
     seen.add(key);
